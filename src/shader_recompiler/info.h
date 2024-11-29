@@ -11,6 +11,7 @@
 #include "common/types.h"
 #include "shader_recompiler/backend/bindings.h"
 #include "shader_recompiler/frontend/copy_shader.h"
+#include "shader_recompiler/frontend/tessellation.h"
 #include "shader_recompiler/ir/attribute.h"
 #include "shader_recompiler/ir/passes/srt.h"
 #include "shader_recompiler/ir/reg.h"
@@ -178,6 +179,7 @@ struct Info {
     UserDataMask ud_mask{};
 
     CopyShaderData gs_copy_data;
+    u32 uses_patches{};
 
     s8 vertex_offset_sgpr = -1;
     s8 instance_offset_sgpr = -1;
@@ -191,8 +193,13 @@ struct Info {
     PersistentSrtInfo srt_info;
     std::vector<u32> flattened_ud_buf;
 
+    // TODO handle indirection
+    IR::ScalarReg tess_consts_ptr_base = IR::ScalarReg::Max;
+    s32 tess_consts_dword_offset = -1;
+
     std::span<const u32> user_data;
     Stage stage;
+    LogicalStage l_stage;
 
     u64 pgm_hash{};
     VAddr pgm_base;
@@ -209,12 +216,14 @@ struct Info {
     bool uses_fp16{};
     bool uses_fp64{};
     bool uses_step_rates{};
+    bool stores_tess_level_outer{};
+    bool stores_tess_level_inner{};
     bool translation_failed{}; // indicates that shader has unsupported instructions
     bool has_readconst{};
     u8 mrt_mask{0u};
 
-    explicit Info(Stage stage_, ShaderParams params)
-        : stage{stage_}, pgm_hash{params.hash}, pgm_base{params.Base()},
+    explicit Info(Stage stage_, LogicalStage l_stage_, ShaderParams params)
+        : stage{stage_}, l_stage{l_stage_}, pgm_hash{params.hash}, pgm_base{params.Base()},
           user_data{params.user_data} {}
 
     template <typename T>
@@ -272,6 +281,21 @@ struct Info {
         if (srt_info.walker_func) {
             srt_info.walker_func(user_data.data(), flattened_ud_buf.data());
         }
+    }
+
+    // TODO probably not needed
+    bool FoundTessConstantsSharp() {
+        return tess_consts_dword_offset >= 0;
+    }
+
+    void ReadTessConstantBuffer(TessellationDataConstantBuffer& tess_constants) {
+        ASSERT(FoundTessConstantsSharp());
+        auto buf = ReadUdReg<AmdGpu::Buffer>(static_cast<u32>(tess_consts_ptr_base),
+                                             static_cast<u32>(tess_consts_dword_offset));
+        VAddr tess_constants_addr = buf.base_address;
+        memcpy(&tess_constants,
+               reinterpret_cast<TessellationDataConstantBuffer*>(tess_constants_addr),
+               sizeof(tess_constants));
     }
 };
 

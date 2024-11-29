@@ -7,6 +7,7 @@
 
 #include "common/assert.h"
 #include "common/scope_exit.h"
+#include "shader_recompiler/runtime_info.h"
 #include "video_core/amdgpu/resource.h"
 #include "video_core/buffer_cache/buffer_cache.h"
 #include "video_core/renderer_vulkan/vk_graphics_pipeline.h"
@@ -15,6 +16,8 @@
 #include "video_core/texture_cache/texture_cache.h"
 
 namespace Vulkan {
+
+using Shader::LogicalStage; // TODO
 
 GraphicsPipeline::GraphicsPipeline(const Instance& instance_, Scheduler& scheduler_,
                                    DescriptorHeap& desc_heap_, const GraphicsPipelineKey& key_,
@@ -25,6 +28,7 @@ GraphicsPipeline::GraphicsPipeline(const Instance& instance_, Scheduler& schedul
     const vk::Device device = instance.GetDevice();
     std::ranges::copy(infos, stages.begin());
     BuildDescSetLayout();
+    const bool uses_tessellation = stages[u32(LogicalStage::TessellationControl)];
 
     const vk::PushConstantRange push_constants = {
         .stageFlags = gp_stage_flags,
@@ -47,7 +51,7 @@ GraphicsPipeline::GraphicsPipeline(const Instance& instance_, Scheduler& schedul
     boost::container::static_vector<vk::VertexInputBindingDescription, 32> vertex_bindings;
     boost::container::static_vector<vk::VertexInputAttributeDescription, 32> vertex_attributes;
     if (!instance.IsVertexInputDynamicState()) {
-        const auto& vs_info = stages[u32(Shader::Stage::Vertex)];
+        const auto& vs_info = stages[u32(LogicalStage::Vertex)];
         for (const auto& input : vs_info->vs_inputs) {
             if (input.instance_step_rate == Shader::Info::VsInput::InstanceIdType::OverStepRate0 ||
                 input.instance_step_rate == Shader::Info::VsInput::InstanceIdType::OverStepRate1) {
@@ -101,6 +105,10 @@ GraphicsPipeline::GraphicsPipeline(const Instance& instance_, Scheduler& schedul
     ASSERT_MSG(!prim_restart || key.primitive_restart_index == 0xFFFF ||
                    key.primitive_restart_index == 0xFFFFFFFF,
                "Primitive restart index other than -1 is not supported yet");
+
+    const vk::PipelineTessellationStateCreateInfo tessellation_state = {
+        .patchControlPoints = key.patch_control_points,
+    };
 
     const vk::PipelineRasterizationStateCreateInfo raster_state = {
         .depthClampEnable = false,
@@ -162,6 +170,9 @@ GraphicsPipeline::GraphicsPipeline(const Instance& instance_, Scheduler& schedul
     } else {
         dynamic_states.push_back(vk::DynamicState::eVertexInputBindingStrideEXT);
     }
+    if (uses_tessellation && instance.IsPatchControlPointsDynamicState()) {
+        dynamic_states.push_back(vk::DynamicState::ePatchControlPointsEXT);
+    }
 
     const vk::PipelineDynamicStateCreateInfo dynamic_info = {
         .dynamicStateCount = static_cast<u32>(dynamic_states.size()),
@@ -198,7 +209,7 @@ GraphicsPipeline::GraphicsPipeline(const Instance& instance_, Scheduler& schedul
 
     boost::container::static_vector<vk::PipelineShaderStageCreateInfo, MaxShaderStages>
         shader_stages;
-    auto stage = u32(Shader::Stage::Vertex);
+    auto stage = u32(LogicalStage::Vertex);
     if (infos[stage]) {
         shader_stages.emplace_back(vk::PipelineShaderStageCreateInfo{
             .stage = vk::ShaderStageFlagBits::eVertex,
@@ -206,7 +217,7 @@ GraphicsPipeline::GraphicsPipeline(const Instance& instance_, Scheduler& schedul
             .pName = "main",
         });
     }
-    stage = u32(Shader::Stage::Geometry);
+    stage = u32(LogicalStage::Geometry);
     if (infos[stage]) {
         shader_stages.emplace_back(vk::PipelineShaderStageCreateInfo{
             .stage = vk::ShaderStageFlagBits::eGeometry,
@@ -214,7 +225,23 @@ GraphicsPipeline::GraphicsPipeline(const Instance& instance_, Scheduler& schedul
             .pName = "main",
         });
     }
-    stage = u32(Shader::Stage::Fragment);
+    stage = u32(LogicalStage::TessellationControl);
+    if (infos[stage]) {
+        shader_stages.emplace_back(vk::PipelineShaderStageCreateInfo{
+            .stage = vk::ShaderStageFlagBits::eTessellationControl,
+            .module = modules[stage],
+            .pName = "main",
+        });
+    }
+    stage = u32(LogicalStage::TessellationEval);
+    if (infos[stage]) {
+        shader_stages.emplace_back(vk::PipelineShaderStageCreateInfo{
+            .stage = vk::ShaderStageFlagBits::eTessellationEvaluation,
+            .module = modules[stage],
+            .pName = "main",
+        });
+    }
+    stage = u32(LogicalStage::Fragment);
     if (infos[stage]) {
         shader_stages.emplace_back(vk::PipelineShaderStageCreateInfo{
             .stage = vk::ShaderStageFlagBits::eFragment,
@@ -297,6 +324,9 @@ GraphicsPipeline::GraphicsPipeline(const Instance& instance_, Scheduler& schedul
         .pStages = shader_stages.data(),
         .pVertexInputState = !instance.IsVertexInputDynamicState() ? &vertex_input_info : nullptr,
         .pInputAssemblyState = &input_assembly,
+        .pTessellationState = (uses_tessellation && !instance.IsPatchControlPointsDynamicState())
+                                  ? &tessellation_state
+                                  : nullptr,
         .pViewportState = &viewport_info,
         .pRasterizationState = &raster_state,
         .pMultisampleState = &multisampling,
