@@ -32,6 +32,7 @@ endif()
 option(ENABLE_QT_GUI "Enable the Qt GUI. If not selected then the emulator uses a minimal SDL-based UI instead" OFF)
 option(ENABLE_DISCORD_RPC "Enable the Discord RPC integration" ON)
 option(ENABLE_UPDATER "Enables the options to updater" ON)
+option(ENABLE_LTO "Enable link-time optimization for specific targets" OFF)
 
 # First, determine whether to use CMAKE_OSX_ARCHITECTURES or CMAKE_SYSTEM_PROCESSOR.
 if (APPLE AND CMAKE_OSX_ARCHITECTURES)
@@ -950,6 +951,11 @@ endif()
 # Discord RPC
 if (ENABLE_DISCORD_RPC)
     target_link_libraries(shadps4 PRIVATE discord-rpc)
+endif()
+
+# Link-time optimization for specific targets
+if (ENABLE_LTO)
+    set_target_properties(core video_core PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
 
 # Install rules
