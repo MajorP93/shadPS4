@@ -854,10 +854,6 @@ if (APPLE)
   target_link_libraries(shadps4 PRIVATE date::date-tz)
 endif()
 
-if (NOT ENABLE_QT_GUI)
-  target_link_libraries(shadps4 PRIVATE SDL3::SDL3)
-endif()
-
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND MSVC)
     target_link_libraries(shadps4 PRIVATE cryptoppwin)
 else()
