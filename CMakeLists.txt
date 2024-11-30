@@ -800,28 +800,23 @@ set(QT_GUI src/qt_gui/about_dialog.cpp
 )
 endif()
 
+add_library(audio_core STATIC ${AUDIO_CORE})
+add_library(common STATIC ${COMMON})
+add_library(core STATIC ${CORE})
+add_library(input STATIC ${INPUT})
+add_library(shader_recompiler STATIC ${SHADER_RECOMPILER})
+add_library(video_core ${VIDEO_CORE})
+
 if (ENABLE_QT_GUI)
     qt_add_executable(shadps4
-        ${AUDIO_CORE}
         ${IMGUI}
-        ${INPUT}
         ${QT_GUI}
-        ${COMMON}
-        ${CORE}
-        ${SHADER_RECOMPILER}
-        ${VIDEO_CORE}
         ${EMULATOR}
         src/images/shadPS4.icns
     )
 else()
     add_executable(shadps4
-        ${AUDIO_CORE}
         ${IMGUI}
-        ${INPUT}
-        ${COMMON}
-        ${CORE}
-        ${SHADER_RECOMPILER}
-        ${VIDEO_CORE}
         ${EMULATOR}
         src/main.cpp
         src/emulator.cpp
@@ -833,6 +828,7 @@ endif()
 
 create_target_directory_groups(shadps4)
 
+target_link_libraries(shadps4 PRIVATE audio_core common core input shader_recompiler video_core)
 target_link_libraries(shadps4 PRIVATE magic_enum::magic_enum fmt::fmt toml11::toml11 tsl::robin_map xbyak::xbyak Tracy::TracyClient RenderDoc::API FFmpeg::ffmpeg Dear_ImGui gcn half::half zlib-ng::zlib png_static)
 target_link_libraries(shadps4 PRIVATE Boost::headers GPUOpen::VulkanMemoryAllocator LibAtrac9 sirit Vulkan::Headers xxHash::xxhash Zydis::Zydis glslang::SPIRV glslang::glslang SDL3::SDL3 pugixml::pugixml)
 
