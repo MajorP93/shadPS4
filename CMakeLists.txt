@@ -20,6 +20,11 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_definitions(_DEBUG)
 endif()
 
+option(ENABLE_PGO "Enables usage of profdata located in pgo directory for building with pgo enabled" OFF)
+if (ENABLE_PGO)
+    add_compile_options(-fprofile-use=${CMAKE_SOURCE_DIR}/pgo/default.profdata)
+endif()
+
 project(shadPS4)
 
 # Forcing PIE makes sure that the base address is high enough so that it doesn't clash with the PS4 memory.
