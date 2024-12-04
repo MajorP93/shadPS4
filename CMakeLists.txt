@@ -37,6 +37,11 @@ endif()
 option(ENABLE_QT_GUI "Enable the Qt GUI. If not selected then the emulator uses a minimal SDL-based UI instead" OFF)
 option(ENABLE_DISCORD_RPC "Enable the Discord RPC integration" ON)
 option(ENABLE_UPDATER "Enables the options to updater" ON)
+option(ENABLE_PGO "Enables usage of profdata located in pgo directory for building with pgo enabled" OFF)
+
+if (ENABLE_PGO)
+    add_compile_options(-fprofile-use=${CMAKE_SOURCE_DIR}/pgo/default.profdata)
+endif()
 
 # First, determine whether to use CMAKE_OSX_ARCHITECTURES or CMAKE_SYSTEM_PROCESSOR.
 if (APPLE AND CMAKE_OSX_ARCHITECTURES)
