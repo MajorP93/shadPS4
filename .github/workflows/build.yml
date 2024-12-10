@@ -60,6 +60,10 @@ jobs:
     runs-on: windows-latest
     needs: get-info
     steps:
+    - name: Upgrade LLVM to 19
+      run: |
+        choco upgrade llvm --version=19.1.5 -y
+
     - uses: actions/checkout@v4
       with:
         submodules: recursive
@@ -104,6 +108,10 @@ jobs:
     runs-on: windows-latest
     needs: get-info
     steps:
+    - name: Upgrade LLVM to 19
+      run: |
+        choco upgrade llvm --version=19.1.5 -y
+
     - uses: actions/checkout@v4
       with:
         submodules: recursive
