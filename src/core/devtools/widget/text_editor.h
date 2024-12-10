@@ -161,7 +161,6 @@ public:
             : mPreprocChar('#'), mAutoIndentation(true), mTokenize(nullptr), mCaseSensitive(true) {}
 
         static const LanguageDefinition& GLSL();
-        static const LanguageDefinition& SPIRV();
     };
 
     TextEditor();

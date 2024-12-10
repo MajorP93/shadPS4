@@ -117,7 +117,7 @@ static bool IsDrawCall(AmdGpu::PM4ItOpcode opcode) {
 inline std::optional<std::string> exec_cli(const char* cli) {
     std::array<char, 64> buffer{};
     std::string output;
-    const auto f = popen(cli, "rt");
+    const auto f = popen(cli, "r");
     if (!f) {
         pclose(f);
         return {};
@@ -129,27 +129,21 @@ inline std::optional<std::string> exec_cli(const char* cli) {
     return output;
 }
 
-template <typename T>
-inline std::string RunDisassembler(const std::string& disassembler_cli, const T& shader_code,
-                                   bool* success = nullptr) {
+inline std::string RunDisassembler(const std::string& disassembler_cli,
+                                   const std::vector<u32>& shader_code) {
     std::string shader_dis;
 
     if (disassembler_cli.empty()) {
         shader_dis = "No disassembler set";
-        if (success) {
-            *success = false;
-        }
     } else {
         auto bin_path = std::filesystem::temp_directory_path() / "shadps4_tmp_shader.bin";
 
         constexpr std::string_view src_arg = "{src}";
-        std::string cli = disassembler_cli + " 2>&1";
+        std::string cli = disassembler_cli;
         const auto pos = cli.find(src_arg);
         if (pos == std::string::npos) {
-            shader_dis = "Disassembler CLI does not contain {src} argument";
-            if (success) {
-                *success = false;
-            }
+            DebugState.ShowDebugMessage("Disassembler CLI does not contain {src} argument\n" +
+                                        disassembler_cli);
         } else {
             cli.replace(pos, src_arg.size(), "\"" + bin_path.string() + "\"");
             Common::FS::IOFile file(bin_path, Common::FS::FileAccessMode::Write);
@@ -157,16 +151,9 @@ inline std::string RunDisassembler(const std::string& disassembler_cli, const T&
             file.Close();
 
             auto result = exec_cli(cli.c_str());
-            if (result) {
-                shader_dis = result.value();
-                if (success) {
-                    *success = true;
-                }
-            } else {
-                if (success) {
-                    *success = false;
-                }
-                shader_dis = "Could not disassemble shader";
+            shader_dis = result.value_or("Could not disassemble shader");
+            if (shader_dis.empty()) {
+                shader_dis = "Disassembly empty or failed";
             }
 
             std::filesystem::remove(bin_path);
